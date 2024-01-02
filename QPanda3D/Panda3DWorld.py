@@ -6,21 +6,22 @@ Description :
     Inherit this object to create your custom world
 """
 
-# PyQt imports
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-
-# Panda imports
-from panda3d.core import *
-# from panda3d.core import loadPrcFileData
-# loadPrcFileData("", "window-type none") # Set Panda to draw its main window in an offscreen buffer
-from direct.showbase.DirectObject import DirectObject
-from panda3d.core import GraphicsOutput, Texture, ConfigVariableManager, WindowProperties
-
 # Set up Panda environment
 from direct.showbase.ShowBase import ShowBase
-import platform
+
+# Panda imports
+from panda3d.core import (
+    FrameBufferProperties,
+    GraphicsOutput,
+    GraphicsPipe,
+    LVecBase4f,
+    Texture,
+    WindowProperties,
+    loadPrcFileData,
+)
+
+# PyQt imports
+from PyQt6.QtWidgets import QWidget
 
 # Local imports
 from QPanda3D.QMouseWatcherNode import QMouseWatcherNode
@@ -33,17 +34,13 @@ class Panda3DWorld(ShowBase):
     Panda3DWorld : A class to handle all panda3D world manipulation
     """
 
-    def __init__(self, width=800, height=600, is_fullscreen=False, size=1.0, clear_color=LVecBase4f(0.1, 0.1, 0.1, 1),
-                 name="qpanda3D"):
-
+    def __init__(self, width=800, height=600, is_fullscreen=False, size=1.0, clear_color=LVecBase4f(0.1, 0.1, 0.1, 1), name="qpanda3D"):
         sort = -100
         self.parent = None
-        # self.width = width
-        # self.height = height
 
         loadPrcFileData("", "win-size {} {}".format(width, height))
 
-        if (is_fullscreen):
+        if is_fullscreen:
             loadPrcFileData("", "fullscreen #t")
         else:
             loadPrcFileData("", "window-type offscreen")  # Set Panda to draw its main window in an offscreen buffer
@@ -65,11 +62,7 @@ class Panda3DWorld(ShowBase):
         props.set_rgba_bits(8, 8, 8, 8)
         props.set_depth_bits(8)
 
-        self.buff = self.graphicsEngine.make_output(
-            self.pipe, name, sort,
-            props, winprops,
-            GraphicsPipe.BF_resizeable,
-            self.win.get_gsg(), self.win)
+        self.buff = self.graphicsEngine.make_output(self.pipe, name, sort, props, winprops, GraphicsPipe.BF_resizeable, self.win.get_gsg(), self.win)
 
         self.buff.addRenderTexture(self.screenTexture, GraphicsOutput.RTMCopyRam)
         self.buff.set_sort(sort)
@@ -89,7 +82,7 @@ class Panda3DWorld(ShowBase):
         self.parent = parent
         self.mouseWatcherNode = QMouseWatcherNode(parent)
 
-    def getAspectRatio(self, win = None):
+    def getAspectRatio(self, win=None) -> float:
         if win is None and self.parent is not None:
             return float(self.parent.width()) / float(self.parent.height())
         else:

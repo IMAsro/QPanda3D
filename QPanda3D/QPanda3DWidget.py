@@ -7,15 +7,22 @@ Description :
     It takes a Panda3DWorld object at init time.
     You should first create the Panda3DWorkd object before creating this widget.
 """
-# PyQt imports
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-
 # Panda imports
-from panda3d.core import Texture, WindowProperties, CallbackGraphicsWindow
-from panda3d.core import loadPrcFileData
+from panda3d.core import Texture, taskMgr, messenger
+
+# PyQt imports
+from PyQt6.QtCore import QSize, QSizeF, Qt, QTimer
+from PyQt6.QtGui import (
+    QImage,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QResizeEvent,
+    QTransform,
+    QWheelEvent,
+)
+from PyQt6.QtWidgets import QWidget
 
 from QPanda3D.QPanda3D_Buttons_Translation import QPanda3D_Button_translation
 from QPanda3D.QPanda3D_Keys_Translation import QPanda3D_Key_translation
@@ -41,29 +48,28 @@ class QPanda3DSynchronizer(QTimer):
         self.stop()
 
 
-
-def get_panda_key_modifiers(evt):
+def get_panda_key_modifiers(event):
+    print(f"in method: get_panda_key_modifiers, type of event: {type(event)}")
     panda_mods = []
-    qt_mods = evt.modifiers()
+    qt_mods = event.modifiers()
     for qt_mod, panda_mod in QPanda3D_Modifier_translation.items():
         if (qt_mods & qt_mod) == qt_mod:
             panda_mods.append(panda_mod)
     return panda_mods
 
 
-def get_panda_key_modifiers_prefix(evt):
-        # join all modifiers (except NoModifier, which is None) with '-'
-    mods = [mod for mod in get_panda_key_modifiers(evt) if mod is not None]
+def get_panda_key_modifiers_prefix(event):
+    # join all modifiers (except NoModifier, which is None) with '-'
+    mods = [mod for mod in get_panda_key_modifiers(event) if mod is not None]
     prefix = "-".join(mods)
 
-    # Fix the case where the modifier key is pressed
-    # alone without other things
+    # Fix the case where the modifier key is pressed alone without other things
     # if not things like control-control would be possible
-    if isinstance(evt, QtGui.QMouseEvent):
-        key = QPanda3D_Button_translation[evt.button()]
-    elif isinstance(evt, QtGui.QKeyEvent):
-        key = QPanda3D_Key_translation[evt.key()]
-    elif isinstance(evt, QtGui.QWheelEvent):
+    if isinstance(event, QMouseEvent):
+        key = QPanda3D_Button_translation[event.button()]
+    elif isinstance(event, QKeyEvent):
+        key = QPanda3D_Key_translation[event.key()]
+    elif isinstance(event, QWheelEvent):
         key = "wheel"
     else:
         raise NotImplementedError("Unknown event type")
@@ -80,6 +86,7 @@ def get_panda_key_modifiers_prefix(evt):
 
     return prefix
 
+
 class QPanda3DWidget(QWidget):
     """
     An interactive panda3D QWidget
@@ -94,17 +101,8 @@ class QPanda3DWidget(QWidget):
         # set fixed geometry
         self.panda3DWorld = panda3DWorld
         self.panda3DWorld.set_parent(self)
-        # Setup a timer in Qt that runs taskMgr.step() to simulate Panda's own main loop
-        # pandaTimer = QTimer(self)
-        # pandaTimer.timeout.connect()
-        # pandaTimer.start(0)
 
-        self.setFocusPolicy(Qt.StrongFocus)
-
-        # Setup another timer that redraws this widget in a specific FPS
-        # redrawTimer = QTimer(self)
-        # redrawTimer.timeout.connect(self.update)
-        # redrawTimer.start(1000/FPS)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self.paintSurface = QPainter()
         self.rotate = QTransform()
@@ -120,43 +118,43 @@ class QPanda3DWidget(QWidget):
 
         self.debug = debug
 
-    def mousePressEvent(self, evt):
-        button = evt.button()
+    def mousePressEvent(self, event: QMouseEvent):
+        button = event.button()
         try:
-            b = f"{get_panda_key_modifiers_prefix(evt)}{QPanda3D_Button_translation[button]}"
+            b = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Button_translation[button]}"
             if self.debug:
                 print(b)
-            messenger.send(b,[{"x":evt.x(),"y":evt.y()}])
+            messenger.send(b, [{"x": event.x(), "y": event.y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
 
-    def mouseMoveEvent(self, evt:QtGui.QMouseEvent):
-        button = evt.button()
+    def mouseMoveEvent(self, event: QMouseEvent):
+        # button = event.button() # not used, is it unnecessary
         try:
             b = "mouse-move"
             if self.debug:
                 print(b)
-            messenger.send(b,[{"x":evt.x(),"y":evt.y()}])
+            messenger.send(b, [{"x": event.x(), "y": event.y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
 
-    def mouseReleaseEvent(self, evt):
-        button = evt.button()
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        button = event.button()
         try:
-            b = f"{get_panda_key_modifiers_prefix(evt)}{QPanda3D_Button_translation[button]}-up"
+            b = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Button_translation[button]}-up"
             if self.debug:
                 print(b)
-            messenger.send(b,[{"x":evt.x(),"y":evt.y()}])
+            messenger.send(b, [{"x": event.x(), "y": event.y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
 
-    def wheelEvent(self, evt):
-        delta = evt.angleDelta().y()
+    def wheelEvent(self, event: QMouseEvent):
+        delta = event.angleDelta().y()
         try:
-            w = f"{get_panda_key_modifiers_prefix(evt)}wheel"
+            w = f"{get_panda_key_modifiers_prefix(event)}wheel"
             if self.debug:
                 print(f"{w} {delta}")
             messenger.send(w, [{"delta": delta}])
@@ -164,10 +162,10 @@ class QPanda3DWidget(QWidget):
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
 
-    def keyPressEvent(self, evt):
-        key = evt.key()
+    def keyPressEvent(self, event: QKeyEvent):
+        key = event.key()
         try:
-            k = f"{get_panda_key_modifiers_prefix(evt)}{QPanda3D_Key_translation[key]}"
+            k = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Key_translation[key]}"
             if self.debug:
                 print(k)
             messenger.send(k)
@@ -175,10 +173,10 @@ class QPanda3DWidget(QWidget):
             print("Unimplemented key. Please send an issue on github to fix this problem")
             print(e)
 
-    def keyReleaseEvent(self, evt):
-        key = evt.key()
+    def keyReleaseEvent(self, event: QKeyEvent):
+        key = event.key()
         try:
-            k = f"{get_panda_key_modifiers_prefix(evt)}{QPanda3D_Key_translation[key]}-up"
+            k = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Key_translation[key]}-up"
             if self.debug:
                 print(k)
             messenger.send(k)
@@ -186,22 +184,20 @@ class QPanda3DWidget(QWidget):
             print("Unimplemented key. Please send an issue on github to fix this problem")
             print(e)
 
-    def resizeEvent(self, evt):
+    def resizeEvent(self, event: QResizeEvent):
         lens = self.panda3DWorld.cam.node().get_lens()
-        lens.set_film_size(self.initial_film_size.width() * evt.size().width() / self.initial_size.width(),
-                           self.initial_film_size.height() * evt.size().height() / self.initial_size.height())
-        self.panda3DWorld.buff.setSize(evt.size().width(), evt.size().height())
+        lens.set_film_size(self.initial_film_size.width() * event.size().width() / self.initial_size.width(), self.initial_film_size.height() * event.size().height() / self.initial_size.height())
+        self.panda3DWorld.buff.setSize(event.size().width(), event.size().height())
 
     def minimumSizeHint(self):
         return QSize(400, 300)
 
     # Use the paint event to pull the contents of the panda texture to the widget
-    def paintEvent(self, event):
+    def paintEvent(self, event: QPaintEvent):
         if self.panda3DWorld.screenTexture.mightHaveRamImage():
             self.panda3DWorld.screenTexture.setFormat(Texture.FRgba32)
             data = self.panda3DWorld.screenTexture.getRamImage().getData()
-            img = QImage(data, self.panda3DWorld.screenTexture.getXSize(), self.panda3DWorld.screenTexture.getYSize(),
-                         QImage.Format_ARGB32).mirrored()
+            img = QImage(data, self.panda3DWorld.screenTexture.getXSize(), self.panda3DWorld.screenTexture.getYSize(), QImage.Format.Format_ARGB32).mirrored()
             self.paintSurface.begin(self)
             self.paintSurface.drawImage(0, 0, img)
 
