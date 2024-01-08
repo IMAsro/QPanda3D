@@ -3,12 +3,14 @@
 Module : QPanda3DWidget
 Author : Saifeddine ALOUI
 Description :
-    This is the QWidget to be inserted in your standard PyQt5 application.
+    This is the QWidget to be inserted in your standard PyQt6 application.
     It takes a Panda3DWorld object at init time.
-    You should first create the Panda3DWorkd object before creating this widget.
+    You should first create the Panda3DWorld object before creating this widget.
 """
 # Panda imports
-from panda3d.core import Texture, taskMgr, messenger
+from direct.showbase import MessengerGlobal
+from direct.task import TaskManagerGlobal
+from panda3d.core import Texture
 
 # PyQt imports
 from PyQt6.QtCore import QSize, QSizeF, Qt, QTimer
@@ -24,6 +26,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
+from QPanda3D.Panda3DWorld import Panda3DWorld
 from QPanda3D.QPanda3D_Buttons_Translation import QPanda3D_Button_translation
 from QPanda3D.QPanda3D_Keys_Translation import QPanda3D_Key_translation
 from QPanda3D.QPanda3D_Modifiers_Translation import QPanda3D_Modifier_translation
@@ -41,15 +44,14 @@ class QPanda3DSynchronizer(QTimer):
 
     def tick(self):
         if self.isActive():
-            taskMgr.step()
+            TaskManagerGlobal.taskMgr.step()
             self.qPanda3DWidget.update()
 
     def __del__(self):
         self.stop()
 
 
-def get_panda_key_modifiers(event):
-    print(f"in method: get_panda_key_modifiers, type of event: {type(event)}")
+def get_panda_key_modifiers(event: QKeyEvent | QWheelEvent | QMouseEvent):
     panda_mods = []
     qt_mods = event.modifiers()
     for qt_mod, panda_mod in QPanda3D_Modifier_translation.items():
@@ -95,7 +97,7 @@ class QPanda3DWidget(QWidget):
     debug: Switch printing key events to console on/off
     """
 
-    def __init__(self, panda3DWorld, parent=None, FPS=60, debug=False):
+    def __init__(self, panda3DWorld: Panda3DWorld, parent=None, FPS=60, debug=False):
         QWidget.__init__(self, parent)
 
         # set fixed geometry
@@ -124,7 +126,7 @@ class QPanda3DWidget(QWidget):
             b = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Button_translation[button]}"
             if self.debug:
                 print(b)
-            messenger.send(b, [{"x": event.x(), "y": event.y()}])
+            MessengerGlobal.messenger.send(b, [{"x": event.pos().x(), "y": event.pos().y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
@@ -135,7 +137,7 @@ class QPanda3DWidget(QWidget):
             b = "mouse-move"
             if self.debug:
                 print(b)
-            messenger.send(b, [{"x": event.x(), "y": event.y()}])
+            MessengerGlobal.messenger.send(b, [{"x": event.pos().x(), "y": event.pos().y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
@@ -146,7 +148,7 @@ class QPanda3DWidget(QWidget):
             b = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Button_translation[button]}-up"
             if self.debug:
                 print(b)
-            messenger.send(b, [{"x": event.x(), "y": event.y()}])
+            MessengerGlobal.messenger.send(b, [{"x": event.pos().x(), "y": event.pos().y()}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
@@ -157,7 +159,7 @@ class QPanda3DWidget(QWidget):
             w = f"{get_panda_key_modifiers_prefix(event)}wheel"
             if self.debug:
                 print(f"{w} {delta}")
-            messenger.send(w, [{"delta": delta}])
+            MessengerGlobal.messenger.send(w, [{"delta": delta}])
         except Exception as e:
             print("Unimplemented button. Please send an issue on github to fix this problem")
             print(e)
@@ -168,7 +170,7 @@ class QPanda3DWidget(QWidget):
             k = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Key_translation[key]}"
             if self.debug:
                 print(k)
-            messenger.send(k)
+            MessengerGlobal.messenger.send(k)
         except Exception as e:
             print("Unimplemented key. Please send an issue on github to fix this problem")
             print(e)
@@ -179,7 +181,7 @@ class QPanda3DWidget(QWidget):
             k = f"{get_panda_key_modifiers_prefix(event)}{QPanda3D_Key_translation[key]}-up"
             if self.debug:
                 print(k)
-            messenger.send(k)
+            MessengerGlobal.messenger.send(k)
         except Exception as e:
             print("Unimplemented key. Please send an issue on github to fix this problem")
             print(e)

@@ -8,10 +8,9 @@ Description :
 """
 
 # Panda imports
-from panda3d.core import LPoint2
+from panda3d.core import LPoint2, MouseWatcher
 
 # PyQt imports
-from PyQt6.QtCore import MouseWatcher
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QWidget
 
