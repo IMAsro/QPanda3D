@@ -7,12 +7,13 @@ Description :
     It takes a Panda3DWorld object at init time.
     You should first create the Panda3DWorld object before creating this widget.
 """
-# Panda imports
+from __future__ import annotations
+
+from ctypes import c_void_p, memmove
+
+import numpy as np
 from direct.showbase import MessengerGlobal
 from direct.task import TaskManagerGlobal
-from panda3d.core import Texture
-
-# PyQt imports
 from PyQt6.QtCore import QSize, QSizeF, Qt, QTimer
 from PyQt6.QtGui import (
     QImage,
@@ -21,7 +22,6 @@ from PyQt6.QtGui import (
     QPainter,
     QPaintEvent,
     QResizeEvent,
-    QTransform,
     QWheelEvent,
 )
 from PyQt6.QtWidgets import QWidget
@@ -35,7 +35,7 @@ __all__ = ["QPanda3DWidget"]
 
 
 class QPanda3DSynchronizer(QTimer):
-    def __init__(self, qPanda3DWidget, FPS=60):
+    def __init__(self, qPanda3DWidget: QPanda3DWidget, FPS=60):
         QTimer.__init__(self)
         self.qPanda3DWidget = qPanda3DWidget
         dt = 1000 // FPS
@@ -106,9 +106,7 @@ class QPanda3DWidget(QWidget):
 
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        self.paintSurface = QPainter()
-        self.rotate = QTransform()
-        self.rotate.rotate(180)
+        self.painter = QPainter()
         self.out_image = QImage()
 
         size = self.panda3DWorld.cam.node().get_lens().get_film_size()
@@ -196,11 +194,23 @@ class QPanda3DWidget(QWidget):
 
     # Use the paint event to pull the contents of the panda texture to the widget
     def paintEvent(self, event: QPaintEvent):
-        if self.panda3DWorld.screenTexture.mightHaveRamImage():
-            self.panda3DWorld.screenTexture.setFormat(Texture.FRgba32)
-            data = self.panda3DWorld.screenTexture.getRamImage().getData()
-            img = QImage(data, self.panda3DWorld.screenTexture.getXSize(), self.panda3DWorld.screenTexture.getYSize(), QImage.Format.Format_ARGB32).mirrored()
-            self.paintSurface.begin(self)
-            self.paintSurface.drawImage(0, 0, img)
+        texture = self.panda3DWorld.screenTexture
+        if texture.mightHaveRamImage():
+            data = texture.getRamImage().getData()
+            width, height = texture.getXSize(), texture.getYSize()
 
-            self.paintSurface.end()
+            # Create a buffer, transpose and rotate the image data
+            buf = np.frombuffer(data, dtype=np.uint8)
+            buf = buf.reshape((height, width, 4))  # Reshape considering height and width
+            buf_transposed = np.ascontiguousarray(np.rot90(np.transpose(buf, (1, 0, 2))))
+
+            # recreate the QImage if the size changed
+            if self.out_image.size() != QSize(height, width):
+                self.out_image = QImage(width, height, QImage.Format.Format_ARGB32)
+
+            memmove(c_void_p(self.out_image.bits().__int__()), buf_transposed.ctypes.data, buf_transposed.size)
+
+            self.painter.begin(self)
+            self.painter.drawImage(0, 0, self.out_image)
+            self.painter.end()
+        event.accept()
